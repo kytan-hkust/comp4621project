@@ -2,16 +2,22 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #define LISTENQ 42 // or ...?
-#define MAGIC 1024 // or ...?
+#define MAX_LINE 1024 // or ...?
+#define MAX_THREADS 42 // or ...?
 #define PORT 999 // or ...?
 
 int main() {
     int listenfd, connfd;
     struct sockaddr_in servaddr;
-    char buffer[MAGIC];
+    char buffer[MAX_LINE];
+
+    int num_threads = 0;
+    pthread_t threads[MAX_THREADS];
+
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         ; //
     }
@@ -37,12 +43,20 @@ int main() {
 
         printf("Incoming connection!\n");
 
+        // -1 for the second parameter?
         snprintf(buffer, sizeof(buffer), "Hello client!\r\n"); // \r?
 
         if (write(connfd, buffer, strlen(buffer)) < 0) {
             ; //
         }
+
+        close(connfd);
     }
 
     return 0;
+}
+
+
+void* f(void *args) {
+    ; //
 }
