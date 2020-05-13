@@ -10,7 +10,51 @@
 #define MAX_THREADS 42 // or ...?
 #define PORT 999 // or ...?
 
+
+int client_side_draft() {
+    char *request = "GET / HTTP/1.0\r\n\r\n";
+
+    int sockfd, n;
+    char writeline[MAX_LINE], recvline[MAX_LINE]; // length?
+    struct sockaddr_in servaddr;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        ; //
+    }
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(80); // 80 for http, 443 for https
+
+    // switch to inet_pton?
+    servaddr.sin_addr.s_addr = inet_addr("172.217.25.14"); // hard-coded google.com
+
+    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+        ; //
+    }
+
+    snprintf(writeline, sizeof(writeline), request); // sizeof(.) - 1?
+
+    write(sockfd, writeline, strlen(writeline));
+
+    while (1) {
+        if ((n = read(sockfd, recvline, sizeof(recvline) - 1)) <= 0) {
+            break;
+        } else {
+            recvline[n] = 0;
+            printf("%s", recvline); //
+        }
+    }
+
+    close(sockfd);
+    return 0;
+}
+
+
 int main() {
+    client_side_draft();
+    return 0;
+
     int listenfd, connfd;
     struct sockaddr_in servaddr;
     char buffer[MAX_LINE];

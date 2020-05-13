@@ -1,2 +1,4 @@
 proxy
 *.o
+*.docx
+*.pdf
