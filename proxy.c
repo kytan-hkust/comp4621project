@@ -12,7 +12,20 @@
 
 
 void init_blocked_list() {
-    //
+    // Placeholder to load blocked list from a text file
+}
+
+
+int in_blocked_list(const char* hostname) {
+    // Hard-coded blocked list for now
+    const char* blocked_list[3] = {"example.com", "sample.com", "sing.cse.ust.hk"};
+
+    // Naively scan the entire blocked list for now
+    int i;
+    for (i = 0; i < 3; ++i) { // hard-coded 3
+        if (strcmp(hostname, blocked_list[i]) == 0) return 1;
+    }
+    return 0;
 }
 
 
@@ -121,17 +134,31 @@ int main() {
         char protocol_version[32]; // length and name
 
         // Parse the request line
-        sscanf(recvline, "%s %s %s\r\n", method, target_URI, protocol_version); // header for sscanf
+        sscanf(recvline, "%s %s %s\r\n", method, target_URI, protocol_version);
 
-        printf("%s is received!\n", method); // debug
-        printf("%s is received!\n", target_URI); // debug
-        printf("%s is received!\n", protocol_version); // debug
+        if (strcmp(method, "GET") == 0) {
+            ; //
+        } else if (strcmp(method, "CONNECT") == 0) {
+            ; //
+        } else {
+            ; //
+        }
+
+        char hostname[128] = "dummy"; //
+        if (in_blocked_list()) { // here?
+            snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n");
+            if (write(connfd, buffer, strlen(buffer)) < 0) {
+                ; //
+            }
+            close(connfd);
+            continue;
+        }
 
         // Parse the header line(s)
         // TODO
 
         // -1 for the second parameter?
-        snprintf(buffer, sizeof(buffer), "Hello client!\r\n"); // \r?
+        snprintf(buffer, sizeof(buffer), "Hello client!\r\n");
 
         if (write(connfd, buffer, strlen(buffer)) < 0) {
             ; //
