@@ -11,6 +11,11 @@
 #define PORT 999 // or ...?
 
 
+void init_blocked_list() {
+    //
+}
+
+
 int client_side_draft() {
     char *request = "GET / HTTP/1.0\r\n\r\n";
 
@@ -40,10 +45,10 @@ int client_side_draft() {
     while (1) {
         if ((n = read(sockfd, recvline, sizeof(recvline) - 1)) <= 0) {
             break;
-        } else {
-            recvline[n] = 0;
-            printf("%s", recvline); //
         }
+
+        recvline[n] = 0;
+        printf("%s", recvline); //
     }
 
     close(sockfd);
@@ -52,8 +57,10 @@ int client_side_draft() {
 
 
 int main() {
-    client_side_draft();
-    return 0;
+    //client_side_draft();
+    //return 0;
+
+    init_blocked_list();
 
     int listenfd, connfd;
     struct sockaddr_in servaddr;
@@ -86,6 +93,42 @@ int main() {
         }
 
         printf("Incoming connection!\n");
+
+        int i = 0, n; //
+        int j; //
+        char recvline[MAX_LINE]; //
+        char one_c, four_c[4 + 1]; //
+        while (i < sizeof(recvline)) {
+            if ((n = read(connfd, &one_c, sizeof(one_c)) <= 0)) { // character by character?
+                break;
+            }
+
+            recvline[i++] = one_c;
+
+            // this 4 and that 4 are hard-coded
+            for (j = 0; j < 4; ++j) four_c[j] = recvline[i - 4 + j];
+
+            // hard-coded
+            if (strcmp(four_c, "\r\n\r\n") == 0) break;
+        }
+
+        recvline[i] = '\0';
+
+        // bound to not overread
+
+        char method[8] = "FAILED";
+        char target_URI[1024]; // length and name
+        char protocol_version[32]; // length and name
+
+        // Parse the request line
+        sscanf(recvline, "%s %s %s\r\n", method, target_URI, protocol_version); // header for sscanf
+
+        printf("%s is received!\n", method); // debug
+        printf("%s is received!\n", target_URI); // debug
+        printf("%s is received!\n", protocol_version); // debug
+
+        // Parse the header line(s)
+        // TODO
 
         // -1 for the second parameter?
         snprintf(buffer, sizeof(buffer), "Hello client!\r\n"); // \r?
