@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #define LISTENQ 42 // or ...?
-#define MAX_LINE 1024 // or ...?
+#define MAX_LINE 8192 // or ...?
 #define MAX_THREADS 42 // or ...?
 #define PORT 999 // or ...?
 
@@ -39,6 +39,31 @@ int in_blocked_list(const char* hostname) {
 }
 
 
+int to_relative(const char* absolute, char* r1, char* r2) {
+    // %[^:/]
+    if (starts_with(absolute, "http:")) {
+        sscanf(absolute, "http://%[^/]%s", r1, r2);
+    }
+    else if (starts_with(absolute, "https:")) {
+        sscanf(absolute, "https://%[^/]%s", r1, r2);
+    }
+    else sscanf(absolute, "%[^/]%s", r1, r2);
+
+    if (starts_with(r1, "www.")) {
+        ; // TODO trim
+    }
+
+    if (strcmp(r2, "") == 0) {
+        r2[0] = '/';
+        r2[1] = '\0';
+    } else if (starts_with(r2, ":")) {
+        ; // TODO port
+    }
+
+    return 1;
+}
+
+
 int to_ip_addr(const char* hostname, char* ip_address) {
     struct hostent* h;
     if ((h = gethostbyname(hostname)) == NULL) {
@@ -58,9 +83,7 @@ int to_ip_addr(const char* hostname, char* ip_address) {
 }
 
 
-int client_side_draft() { // return type?
-    char* request = "GET / HTTP/1.0\r\n\r\n";
-
+int client_side_draft(const char* request, const char* hostname) { // return type?
     int sockfd, n;
     char writeline[MAX_LINE], recvline[MAX_LINE]; // length?
     struct sockaddr_in servaddr;
@@ -73,10 +96,8 @@ int client_side_draft() { // return type?
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(80); // 80 for http, 443 for https
 
-    // TODO
-    char* h = "www.google.com";
     char ip_address[48] = "0.0.0.0";
-    if (to_ip_addr(h, ip_address)) ;
+    if (to_ip_addr(hostname, ip_address)) ;
     else {
         ; //
     }
@@ -181,6 +202,8 @@ int main() {
         char protocol_version[32]; // length and name
 
         // Parse the request line
+        char request[MAX_LINE];
+
         sscanf(recvline, "%s %s %s\r\n", method, target_URI, protocol_version);
 
         if (strcmp(method, "GET") == 0) {
@@ -197,7 +220,7 @@ int main() {
             continue;
         }
 
-        char hostname[128];
+        char hostname[128] = "google.com"; // hard-coded
         // TODO
         // 1. target_URI
         // 2. Host header
@@ -239,6 +262,7 @@ int main() {
 
         // Forward the response
         // TODO
+        client_side_draft(request, hostname); //
 
         // -1 for the second parameter?
         snprintf(buffer, sizeof(buffer), "Hello client!\r\n");
