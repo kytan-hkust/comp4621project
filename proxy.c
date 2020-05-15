@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -37,6 +39,25 @@ int in_blocked_list(const char* hostname) {
 }
 
 
+int to_ip_addr(const char* hostname, char* ip_address) {
+    struct hostent* h;
+    if ((h = gethostbyname(hostname)) == NULL) {
+        ; //
+        return 0;
+    }
+
+    struct in_addr** ip_addresses = (struct in_addr **) h->h_addr_list;
+    if (ip_addresses == NULL || ip_addresses[0] == NULL) {
+        ; //
+        return 0;
+    }
+
+    char* s = inet_ntoa(*ip_addresses[0]);
+    strcpy(ip_address, s); // buffer overflow..., IPv4 only?
+    return 1;
+}
+
+
 int client_side_draft() { // return type?
     char* request = "GET / HTTP/1.0\r\n\r\n";
 
@@ -52,8 +73,16 @@ int client_side_draft() { // return type?
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(80); // 80 for http, 443 for https
 
+    // TODO
+    char* h = "www.google.com";
+    char ip_address[48] = "0.0.0.0";
+    if (to_ip_addr(h, ip_address)) ;
+    else {
+        ; //
+    }
+
     // switch to inet_pton?
-    servaddr.sin_addr.s_addr = inet_addr("172.217.25.14"); // hard-coded google.com
+    servaddr.sin_addr.s_addr = inet_addr(ip_address);
 
     if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
         ; //
@@ -91,9 +120,6 @@ void https_draft() { // return type?
 
 
 int main() {
-    //client_side_draft();
-    //return 0;
-
     init_blocked_list();
 
     int listenfd, connfd;
@@ -151,7 +177,7 @@ int main() {
         // bound to not overread
 
         char method[8] = "FAILED";
-        char target_URI[1024]; // length and name
+        char target_URI[1024]; // length and name, will be used for caching (absolute)
         char protocol_version[32]; // length and name
 
         // Parse the request line
