@@ -11,6 +11,14 @@
 #define PORT 999 // or ...?
 
 
+int starts_with(const char* s, const char* prefix) {
+    while (*prefix) {
+        if(*s++ != *prefix++) return 0;
+    }
+    return 1;
+}
+
+
 void init_blocked_list() {
     // Placeholder to load blocked list from a text file
 }
@@ -30,7 +38,7 @@ int in_blocked_list(const char* hostname) {
 
 
 int client_side_draft() {
-    char *request = "GET / HTTP/1.0\r\n\r\n";
+    char* request = "GET / HTTP/1.0\r\n\r\n";
 
     int sockfd, n;
     char writeline[MAX_LINE], recvline[MAX_LINE]; // length?
@@ -141,11 +149,12 @@ int main() {
         } else if (strcmp(method, "CONNECT") == 0) {
             ; //
         } else {
+            // Not supported?
             ; //
         }
 
         char hostname[128] = "dummy"; //
-        if (in_blocked_list()) { // here?
+        if (in_blocked_list(hostname)) { // here?
             snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n");
             if (write(connfd, buffer, strlen(buffer)) < 0) {
                 ; //
@@ -155,7 +164,20 @@ int main() {
         }
 
         // Parse the header line(s)
-        // TODO
+        char* next = recvline; //
+        char header[128] = "dummy", field[1024] = "dummy"; //
+        while (1) {
+            next = strstr(next, "\r\n"); // NULL?
+            next += 2;
+            if (starts_with(next, "\r\n")) break;
+            sscanf(next, "%[^:]: %s\r\n", header, field); // buffer overrun?
+
+            if (strcmp(header, "???") == 0) {
+                ; //
+            } else {
+                ; //
+            }
+        }
 
         // -1 for the second parameter?
         snprintf(buffer, sizeof(buffer), "Hello client!\r\n");
@@ -171,6 +193,6 @@ int main() {
 }
 
 
-void* f(void *args) {
+void* f(void* args) {
     ; //
 }
