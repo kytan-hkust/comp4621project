@@ -37,7 +37,7 @@ int in_blocked_list(const char* hostname) {
 }
 
 
-int client_side_draft() {
+int client_side_draft() { // return type?
     char* request = "GET / HTTP/1.0\r\n\r\n";
 
     int sockfd, n;
@@ -74,6 +74,19 @@ int client_side_draft() {
 
     close(sockfd);
     return 0;
+}
+
+
+void https_draft() { // return type?
+    // Build a connection with target
+    // TODO
+
+    // success
+    "HTTP/1.1 200 Connection Established\r\n\r\n"; // version
+
+    // failed
+
+    // may reuse the same socket to avoid reestablishing connection
 }
 
 
@@ -149,13 +162,22 @@ int main() {
         } else if (strcmp(method, "CONNECT") == 0) {
             ; //
         } else {
-            // Not supported?
-            ; //
+            // Not supported? HEAD?
+            snprintf(buffer, sizeof(buffer), "HTTP/1.1 501 Not Implemented\r\n\r\n"); // version?
+            if (write(connfd, buffer, strlen(buffer)) < 0) {
+                ; //
+            }
+            close(connfd);
+            continue;
         }
 
-        char hostname[128] = "dummy"; //
+        char hostname[128];
+        // TODO
+        // 1. target_URI
+        // 2. Host header
+
         if (in_blocked_list(hostname)) { // here?
-            snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n");
+            snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n"); // version?
             if (write(connfd, buffer, strlen(buffer)) < 0) {
                 ; //
             }
@@ -172,12 +194,25 @@ int main() {
             if (starts_with(next, "\r\n")) break;
             sscanf(next, "%[^:]: %s\r\n", header, field); // buffer overrun?
 
-            if (strcmp(header, "???") == 0) {
+            if (strcmp(header, "Proxy-Connection") == 0) {
                 ; //
             } else {
                 ; //
             }
         }
+
+        // Parse the message body
+        // TODO
+        // 1. Content-Length if provided
+        // 2. ???
+
+        // Construct a request on behalf of the client
+        // TODO
+        // 1. from absolute to relative
+        // 2. from Proxy-Connection to Connection
+
+        // Forward the response
+        // TODO
 
         // -1 for the second parameter?
         snprintf(buffer, sizeof(buffer), "Hello client!\r\n");
