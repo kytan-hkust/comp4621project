@@ -7,9 +7,9 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define LISTENQ 42 // or ...?
-#define MAX_LINE 8192 // or ...?
-#define MAX_THREADS 42 // or ...?
+#define LISTENQ 8 // or ...?????
+#define MAX_LINE 8192 // or ...? 1024, 8192, 81920
+#define MAX_THREADS 8 // or ...?????
 #define PORT 12345
 
 
@@ -30,7 +30,7 @@ int in_blocked_list(const char* hostname) {
     const int BLOCKED_LIST_LEN = 4; // hard-coded;
     // Hard-coded blocked list for now
     // const char* blocked_list[3] = {"example.com", "sample.com", "sing.cse.ust.hk"}; // 3...
-    const char* blocked_list[4] = {"detectportal.firefox.com", "www.example.com", "http://www.example.com", "http://example.com"};
+    const char* blocked_list[4] = {"a1", "b2", "c3", "d4"};
 
     // Naively scan the entire blocked list for now
     int i;
@@ -88,8 +88,8 @@ int to_ip_addr(const char* hostname, char* ip_address) {
 
 int client_side_draft(const char* request, const char* hostname, char* recvline) { // return type?
     printf("[LOG]\tIn client_side_draft\n");
-    printf("[INFO]\t%s!\n", request);
-    printf("[INFO]\t%s!\n", hostname);
+    printf("[DEBUG]\t{%s}\n", request);
+    printf("[DEBUG]\t{%s}\n", hostname);
     int sockfd, n;
     char writeline[MAX_LINE]; // length?
     // char recvline[MAX_LINE] = "..."; // length???!!!
@@ -110,6 +110,7 @@ int client_side_draft(const char* request, const char* hostname, char* recvline)
     }
     else {
         printf("[ERROR]\tIP address lookup failed\n"); //
+        return 1; //
     }
 
     // switch to inet_pton?
@@ -127,6 +128,8 @@ int client_side_draft(const char* request, const char* hostname, char* recvline)
     printf("[LOG]\tReceiving the response from target\n");
 
     // TODO THE HOPELESS LOOP...
+
+    /* partial response... */
     int bytes_read = 0;
     while (bytes_read < MAX_LINE) {
         n = read(sockfd, recvline + bytes_read, MAX_LINE - bytes_read);
@@ -332,7 +335,7 @@ int main() {
         // Forward the response
         // TODO
         // length???!!!
-        char troubling_buffer[MAX_LINE] = "HTTP/1.1 200 OK\r\n\r\n<html>Hi</html>";
+        char troubling_buffer[MAX_LINE] = "HTTP/1.1 200 OK\r\n\r\n<html>Hi...</html>";
         client_side_draft(request, hostname, troubling_buffer); // TODO: fix hostname
 
         printf("[LOG]\tPrepare to forward the response\n");
