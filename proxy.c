@@ -30,7 +30,7 @@ int in_blocked_list(const char* hostname) {
     const int BLOCKED_LIST_LEN = 4; // hard-coded;
     // Hard-coded blocked list for now
     // const char* blocked_list[3] = {"example.com", "sample.com", "sing.cse.ust.hk"}; // 3...
-    const char* blocked_list[4] = {"example.com", "www.example.com", "http://www.example.com", "http://example.com"};
+    const char* blocked_list[4] = {"detectportal.firefox.com", "www.example.com", "http://www.example.com", "http://example.com"};
 
     // Naively scan the entire blocked list for now
     int i;
@@ -86,14 +86,75 @@ int to_ip_addr(const char* hostname, char* ip_address) {
 }
 
 
-int client_side_draft(const char* request, const char* hostname) {
-    ; // TODO...
+int client_side_draft(const char* request, const char* hostname, char* recvline) { // return type?
+    printf("[LOG]\tIn client_side_draft\n");
+    printf("[INFO]\t%s!\n", request);
+    printf("[INFO]\t%s!\n", hostname);
+    int sockfd, n;
+    char writeline[MAX_LINE]; // length?
+    // char recvline[MAX_LINE] = "..."; // length???!!!
+    struct sockaddr_in servaddr;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("[ERROR]\tSocket init failed\n"); //
+        return 0; //
+    }
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(80); // 80 for http, 443 for https
+
+    char ip_address[48];
+    if (to_ip_addr(hostname, ip_address)) {
+        printf("[LOG]\tIP address lookup okay\n"); //
+    }
+    else {
+        printf("[ERROR]\tIP address lookup failed\n"); //
+    }
+
+    // switch to inet_pton?
+    servaddr.sin_addr.s_addr = inet_addr(ip_address);
+
+    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+        printf("[ERROR]\tSocket connect failed\n"); //
+        return 0; //
+    }
+
+    snprintf(writeline, sizeof(writeline), request); // sizeof(.) - 1?
+
+    write(sockfd, writeline, strlen(writeline));
+
+    printf("[LOG]\tReceiving the response from target\n");
+
+    // TODO THE HOPELESS LOOP...
+    int bytes_read = 0;
+    while (bytes_read < MAX_LINE) {
+        n = read(sockfd, recvline + bytes_read, MAX_LINE - bytes_read);
+        if (n <= 0) {
+            break;
+        }
+        bytes_read += n;
+    }
+
+    // '\0'?
+    recvline[bytes_read] = '\0';
+
+    printf("[LOG]\tReceived the response from target\n");
+
+    printf("[DEBUG]\t%s\n", recvline);
+
+    close(sockfd);
+    return 0;
 }
 
 
-void https_draft() { // return type?
+void https_handler(const char* hostname) { // return type?
     // Build a connection with target
     // TODO
+
+    char ip_address[48];
+    if (to_ip_addr(hostname, ip_address)) printf("[LOG]\tIP address lookup succeeded\n");
+    else printf("[ERROR]\tIP address lookup failed\n");
 
     // success
     "HTTP/1.1 200 Connection Established\r\n\r\n"; // version
@@ -115,7 +176,7 @@ int main() {
     pthread_t threads[MAX_THREADS];
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("[ERROR]\tinit socket\n"); //
+        printf("[ERROR]\tSocket init failed\n"); //
         return 0; //
     }
 
@@ -125,19 +186,19 @@ int main() {
     servaddr.sin_port = htons(PORT);
 
     if (bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
-        printf("[ERROR]\tbind\n"); //
+        printf("[ERROR]\tSocket bind failed\n"); //
         return 0; //
     }
 
     if (listen(listenfd, LISTENQ) < 0) {
-        printf("[ERROR]\tlisten\n"); //
+        printf("[ERROR]\tSocket listen failed\n"); //
         return 0; //
     }
 
     while (1) {
         // type of the 3rd parameter?
         if ((connfd = accept(listenfd, (struct sockaddr *) NULL, NULL)) < 0) {
-            printf("[ERROR]\taccept\n"); //
+            printf("[ERROR]\tSocket accept failed\n"); //
             return 0; //
         }
 
@@ -243,7 +304,7 @@ int main() {
             // TODO: fix this bug
             snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n"); // version?
             if (write(connfd, buffer, strlen(buffer)) < 0) {
-                printf("[ERROR]\twrite\n"); //
+                printf("[ERROR]\tSocket write failed\n"); //
                 return 0; //
             }
             close(connfd);
@@ -270,16 +331,17 @@ int main() {
 
         // Forward the response
         // TODO
-        char some_buffer[MAX_LINE] = "HTTP/1.1 200 OK\r\n\r\n<html>Hi</html>"; // just for debug
-        client_side_draft(request, hostname); // TODO: fix hostname
+        // length???!!!
+        char troubling_buffer[MAX_LINE] = "HTTP/1.1 200 OK\r\n\r\n<html>Hi</html>";
+        client_side_draft(request, hostname, troubling_buffer); // TODO: fix hostname
 
-        printf("writing back to client step 2\n");
+        printf("[LOG]\tPrepare to forward the response\n");
 
         // -1 for the second parameter?
-        snprintf(buffer, sizeof(buffer), some_buffer);
+        snprintf(buffer, sizeof(buffer), troubling_buffer);
 
         if (write(connfd, buffer, strlen(buffer)) < 0) {
-            printf("[ERROR]\twrite\n"); //
+            printf("[ERROR]\tSocket write failed\n"); //
             return 0; //
         }
 
