@@ -10,7 +10,7 @@
 #define LISTENQ 42 // or ...?
 #define MAX_LINE 8192 // or ...?
 #define MAX_THREADS 42 // or ...?
-#define PORT 999 // or ...?
+#define PORT 12345
 
 
 int starts_with(const char* s, const char* prefix) {
@@ -27,12 +27,14 @@ void init_blocked_list() {
 
 
 int in_blocked_list(const char* hostname) {
+    const int BLOCKED_LIST_LEN = 4; // hard-coded;
     // Hard-coded blocked list for now
-    const char* blocked_list[3] = {"example.com", "sample.com", "sing.cse.ust.hk"};
+    // const char* blocked_list[3] = {"example.com", "sample.com", "sing.cse.ust.hk"}; // 3...
+    const char* blocked_list[4] = {"example.com", "www.example.com", "http://www.example.com", "http://example.com"};
 
     // Naively scan the entire blocked list for now
     int i;
-    for (i = 0; i < 3; ++i) { // hard-coded 3
+    for (i = 0; i < BLOCKED_LIST_LEN; ++i) {
         if (strcmp(hostname, blocked_list[i]) == 0) return 1;
     }
     return 0;
@@ -40,6 +42,7 @@ int in_blocked_list(const char* hostname) {
 
 
 int to_relative(const char* absolute, char* r1, char* r2) {
+    // TODO: from absolute to relative
     // %[^:/]
     if (starts_with(absolute, "http:")) {
         sscanf(absolute, "http://%[^/]%s", r1, r2);
@@ -83,47 +86,8 @@ int to_ip_addr(const char* hostname, char* ip_address) {
 }
 
 
-int client_side_draft(const char* request, const char* hostname) { // return type?
-    int sockfd, n;
-    char writeline[MAX_LINE], recvline[MAX_LINE]; // length?
-    struct sockaddr_in servaddr;
-
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        ; //
-    }
-
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(80); // 80 for http, 443 for https
-
-    char ip_address[48] = "0.0.0.0";
-    if (to_ip_addr(hostname, ip_address)) ;
-    else {
-        ; //
-    }
-
-    // switch to inet_pton?
-    servaddr.sin_addr.s_addr = inet_addr(ip_address);
-
-    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
-        ; //
-    }
-
-    snprintf(writeline, sizeof(writeline), request); // sizeof(.) - 1?
-
-    write(sockfd, writeline, strlen(writeline));
-
-    while (1) {
-        if ((n = read(sockfd, recvline, sizeof(recvline) - 1)) <= 0) {
-            break;
-        }
-
-        recvline[n] = 0;
-        printf("%s", recvline); //
-    }
-
-    close(sockfd);
-    return 0;
+int client_side_draft(const char* request, const char* hostname) {
+    ; // TODO...
 }
 
 
@@ -151,7 +115,8 @@ int main() {
     pthread_t threads[MAX_THREADS];
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        ; //
+        printf("[ERROR]\tinit socket\n"); //
+        return 0; //
     }
 
     memset(&servaddr, 0, sizeof(servaddr));
@@ -160,21 +125,25 @@ int main() {
     servaddr.sin_port = htons(PORT);
 
     if (bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
-        ; //
+        printf("[ERROR]\tbind\n"); //
+        return 0; //
     }
 
     if (listen(listenfd, LISTENQ) < 0) {
-        ; //
+        printf("[ERROR]\tlisten\n"); //
+        return 0; //
     }
 
     while (1) {
         // type of the 3rd parameter?
         if ((connfd = accept(listenfd, (struct sockaddr *) NULL, NULL)) < 0) {
-            ; //
+            printf("[ERROR]\taccept\n"); //
+            return 0; //
         }
 
-        printf("Incoming connection!\n");
+        printf("[INFO]\tIncoming request\n");
 
+        int content_length = 0;
         int i = 0, n; //
         int j; //
         char recvline[MAX_LINE]; //
@@ -183,6 +152,8 @@ int main() {
             if ((n = read(connfd, &one_c, sizeof(one_c)) <= 0)) { // character by character?
                 break;
             }
+
+            content_length += n;
 
             recvline[i++] = one_c;
 
@@ -194,15 +165,17 @@ int main() {
         }
 
         recvline[i] = '\0';
+        printf("[INFO]\tReceived request from client\n");
 
         // bound to not overread
 
-        char method[8] = "FAILED";
+        char method[8];
         char target_URI[1024]; // length and name, will be used for caching (absolute)
         char protocol_version[32]; // length and name
 
         // Parse the request line
         char request[MAX_LINE];
+        char* tmp = request;
 
         sscanf(recvline, "%s %s %s\r\n", method, target_URI, protocol_version);
 
@@ -220,56 +193,97 @@ int main() {
             continue;
         }
 
-        char hostname[128] = "google.com"; // hard-coded
-        // TODO
-        // 1. target_URI
-        // 2. Host header
+        char hostname[128];
 
-        if (in_blocked_list(hostname)) { // here?
-            snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n"); // version?
-            if (write(connfd, buffer, strlen(buffer)) < 0) {
-                ; //
-            }
-            close(connfd);
-            continue;
-        }
+        char r1[128], r2[128]; //
+        to_relative(target_URI, r1, r2);
+
+        // Construct a request on behalf of the client
+        strcpy(tmp, method); //
+        tmp += strlen(method);
+        strcpy(tmp, " "); //
+        ++tmp;;
+        strcpy(tmp, r2);
+        tmp += strlen(r2);
+        strcpy(tmp, " ");
+        ++tmp;;
+        strcpy(tmp, protocol_version);
+        tmp += strlen(protocol_version);
+        strcpy(tmp, "\r\n");
+        tmp += 2;
 
         // Parse the header line(s)
         char* next = recvline; //
-        char header[128] = "dummy", field[1024] = "dummy"; //
+        char header[128] = "", field[1024] = ""; //
         while (1) {
             next = strstr(next, "\r\n"); // NULL?
             next += 2;
             if (starts_with(next, "\r\n")) break;
             sscanf(next, "%[^:]: %s\r\n", header, field); // buffer overrun?
 
-            if (strcmp(header, "Proxy-Connection") == 0) {
-                ; //
-            } else {
-                ; //
-            }
+            if (strcmp(header, "Host") == 0) strcpy(hostname, field); // port might follow
+            else if (strcmp(header, "Proxy-Connection") == 0) strcpy(header, "Connection");
+            else if (strcmp(header, "Content-Length") == 0) ; // TODO
+
+            strcpy(tmp, header);
+            tmp += strlen(header);
+            strcpy(tmp, ": ");
+            tmp += 2;
+            strcpy(tmp, field);
+            tmp += strlen(field);
+            strcpy(tmp, "\r\n");
+            tmp += 2;
         }
 
-        // Parse the message body
+        strcpy(tmp, "\r\n");
+        tmp += 2;
+
+        if (in_blocked_list(hostname)) { // TODO: move to the appropriate location
+            printf("[LOG] Website blocked\n");
+            // TODO: fix this bug
+            snprintf(buffer, sizeof(buffer), "HTTP/1.1 404 Not Found\r\n\r\n"); // version?
+            if (write(connfd, buffer, strlen(buffer)) < 0) {
+                printf("[ERROR]\twrite\n"); //
+                return 0; //
+            }
+            close(connfd);
+            continue;
+        }
+
         // TODO
         // 1. Content-Length if provided
         // 2. ???
 
-        // Construct a request on behalf of the client
         // TODO
-        // 1. from absolute to relative
-        // 2. from Proxy-Connection to Connection
+        // Move the message body to the remaining part of request
+
+        int written = tmp - request;
+        while (written < content_length) {
+            *tmp = request[written];
+            ++written;
+            ++tmp;
+        }
+        // '\0' at the end
+        *tmp = '\0';
+
+        printf("[LOG] Prepare to request on behalf of client\n");
 
         // Forward the response
         // TODO
-        client_side_draft(request, hostname); //
+        char some_buffer[MAX_LINE] = "HTTP/1.1 200 OK\r\n\r\n<html>Hi</html>"; // just for debug
+        client_side_draft(request, hostname); // TODO: fix hostname
+
+        printf("writing back to client step 2\n");
 
         // -1 for the second parameter?
-        snprintf(buffer, sizeof(buffer), "Hello client!\r\n");
+        snprintf(buffer, sizeof(buffer), some_buffer);
 
         if (write(connfd, buffer, strlen(buffer)) < 0) {
-            ; //
+            printf("[ERROR]\twrite\n"); //
+            return 0; //
         }
+
+        printf("[LOG]\tForwarded the response to client\n");
 
         close(connfd);
     }
