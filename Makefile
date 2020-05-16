@@ -1,14 +1,15 @@
-CC     = gcc
-CFLAGS = -Wall
-TARGET = proxy
+CC      = gcc
+CFLAGS  = -Wall
+LDFLAGS = -lpthread
+TARGET  = proxy
 
 all: $(TARGET)
 
 $(TARGET): $(TARGET).o
-	$(CC) $(CFLAGS) -o $(TARGET) $(TARGET).o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) $(TARGET).o
 
 $(TARGET).o: $(TARGET).c
-	$(CC) $(CFLAGS) -c $(TARGET).c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c $(TARGET).c
 
 clean:
 	rm $(TARGET) *.o

@@ -7,7 +7,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define LISTENQ 8 // or ...?????
+#define LISTENQ 1024 // or 8 ???
 #define MAX_LINE 8192 // or ...? 1024, 8192, 81920
 #define MAX_THREADS 8 // or ...?????
 #define PORT 12345
@@ -246,7 +246,9 @@ int main() {
         if (strcmp(method, "GET") == 0) {
             ; //
         } else if (strcmp(method, "CONNECT") == 0) {
-            ; //
+            printf("[INFO]\tDropping HTTPS for now\n");
+            close(connfd);
+            continue;
         } else {
             // Not supported? HEAD?
             snprintf(buffer, sizeof(buffer), "HTTP/1.1 501 Not Implemented\r\n\r\n"); // version?
