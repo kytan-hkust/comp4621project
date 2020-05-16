@@ -13,6 +13,66 @@
 #define PORT        12345
 
 
+int starts_with(const char* s, const char* prefix) {
+    while (*prefix) {
+        if (*s++ != *prefix++) return 0;
+    }
+    return 1;
+}
+
+
+int to_ip_addr(const char* hostname, char* ip_address) {
+    struct hostent* h;
+    if ((h = gethostbyname(hostname)) == NULL) return 0;
+
+    struct in_addr** ip_addresses = (struct in_addr **) h->h_addr_list;
+    if (ip_addresses == NULL || ip_addresses[0] == NULL) return 0;
+
+    char* s = inet_ntoa(*ip_addresses[0]);
+    strcpy(ip_address, s);
+    return 1;
+}
+
+
+int parse_absolute(const char* absolute, char* hostname, char* pathname) {
+    if (starts_with(absolute, "http:")) sscanf(absolute, "http://%[^/]%s", hostname, pathname);
+    else if (starts_with(absolute, "https:")) sscanf(absolute, "https://%[^/]%s", hostname, pathname);
+    else sscanf(absolute, "%[^/]%s", hostname, pathname);
+
+    if (starts_with(hostname, "www.")) {
+        int i = 0;
+        while (hostname[i + 4] != '\0') {
+            hostname[i] = hostname[i + 4];
+            ++i;
+        }
+        hostname[i] = '\0';
+    }
+
+    if (strcmp(pathname, "") == 0) {
+        pathname[0] = '/';
+        pathname[1] = '\0';
+    }
+
+    int port = 0;
+    char* t = strstr(hostname, ":");
+    if (t) {
+        *t = '\0';
+        ++t;
+        while (*t != '\0') {
+            port *= 10;
+            port += *t - '0';
+            ++t;
+        }
+    }
+    return port;
+}
+
+
+int is_blocked(const char* hostname) {
+    return 0;
+}
+
+
 void read_request(int connfd, char* recvline, int L) {
     int i = 0, j, n;
     char c, c4[5];
@@ -34,6 +94,19 @@ void* request_handler(void* args) {
 
     char request_received[MAX_LINE];
     read_request(connfd, request_received, sizeof(request_received));
+
+    // Parse the request line
+    char method[8], target[2048], version[16];
+    sscanf(recvline, "%s %s %s\r\n", method, target, version);
+
+    if (strcmp(method, "GET") == 0) ;           // TODO
+    else if (strcmp(method, "CONNECT") == 0) ;  // TODO
+    else ;                                      // TODO
+
+    char hostname[2048], pathname[2048];
+    parse_absolute(target, hostname, pathname);
+
+    if (is_blocked(hostname)) ;                 // TODO
 
     close(connfd);
 }
