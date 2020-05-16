@@ -8,6 +8,9 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#define PORT    12345
+#define LISTENQ 1024
+
 
 int starts_with(const char* s, const char* prefix) {
     while (*prefix) {
@@ -82,8 +85,32 @@ int is_blocked(const char* hostname) {
 
 
 int main() {
+    int listenfd, connfd;
+    struct sockaddr_in servaddr;
+
+    if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("[ERROR]\tSocket init failed\n");
+        return 0;
+    }
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(PORT);
+
+    if (bind(listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+        printf("[ERROR]\tSocket bind failed\n");
+        return 0;
+    }
+
+    if (listen(listenfd, LISTENQ) < 0) {
+        printf("[ERROR]\tSocket listen failed\n");
+        return 0;
+    }
+
     while (1) {
         break;
     }
+
     return 0;
 }
