@@ -91,7 +91,23 @@ int is_cached(const char* absolute_url) {
 }
 
 
-ssize_t wrapped_write(int fd, void* buf, size_t count) {
+ssize_t wrapped_read(int fd, char* buf, size_t count) {
+    size_t progress = 0;
+    ssize_t n;
+
+    while (progress < count) {
+        n = read(fd, buf + progress, count - progress);
+        if (n < 0) {
+            printf("[ERROR]\tSocket read failed\n");
+            return -1;
+        } else if (n == 0) break;
+        progress += n;
+    }
+    return n;
+}
+
+
+ssize_t wrapped_write(int fd, char* buf, size_t count) {
     char* t = buf;
     size_t left = count;
     ssize_t n;
@@ -119,30 +135,46 @@ void reply_not_implemented(int in_fd, const char* version) {
 }
 
 
-int read_request(int in_fd, char* request) {
-    int i = 0, j, n;
-    char c, c4[5];
+int obtain_out_fd(const char* hostname) {
+    int out_fd;
+    struct sockaddr_in servaddr;
 
-    while (i < MAX_LINE) {
-        n = read(in_fd, &c, 1);
-        if (n < 0) {
-            printf("[ERROR]\tSocket read failed\n");
-            return 1;
-        }
-        else if (n == 0) break;
-        request[i++] = c;
+    struct timeval t;
+    t.tv_sec = 5;
+    t.tv_usec = 0;
 
-        for (j = 0; j < 4; ++j) c4[j] = request[i - 4 + j];
-        if (strcmp(c4, "\r\n\r\n") == 0) break;
+    out_fd = socket(AF_INET, SOCK_STREAM, 0);
+    setsockopt(out_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &t, sizeof(t));
+
+    if (out_fd < 0) {
+        printf("[ERROR]\tSocket init failed\n");
+        return out_fd;
     }
-    request[i] = '\0';
-    return 0;
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(80);
+
+    char ip_address[48];
+    if (!to_ip_addr(hostname, ip_address)) {
+        printf("[ERROR]\tIP address lookup failed\n");
+        return -1;
+    }
+    servaddr.sin_addr.s_addr = inet_addr(ip_address);
+
+    if (connect(out_fd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+        printf("[ERROR]\tSocket connect failed\n");
+        return -1;
+    }
+
+    return out_fd;
 }
 
 
 void handle_request(int in_fd) {
     char request[MAX_LINE];
-    read_request(in_fd, request);
+    memset(&request, 0, sizeof(request));
+    wrapped_read(in_fd, request, MAX_LINE - 1); // -1...?
 
     char method[8], target[2048], version[16];
     sscanf(request, "%s %s %s\r\n", method, target, version);
@@ -153,7 +185,39 @@ void handle_request(int in_fd) {
     if (strcmp(method, "GET") == 0) {
         if (is_blocked(hostname)) reply_not_found(in_fd, version);
         else {
-            //
+            int out_fd = obtain_out_fd(hostname);
+            if (out_fd < 0) {
+                //
+            }
+
+            char buffer[MAX_LINE];
+            snprintf(buffer, sizeof(buffer), "%s %s %s\r\n", method, pathname, version);
+            wrapped_write(out_fd, buffer, strlen(buffer));
+
+            char header[1024], field[1024];
+            char* next = request;
+            while (1) {
+                next = strstr(next, "\r\n");
+                next += 2;
+                if (starts_with(next, "\r\n")) break;
+                sscanf(next, "%[^:]: %[^\n]\r\n", header, field);
+
+                if (strcmp(header, "Proxy-Connection") == 0) strcpy(header, "Connection");
+                snprintf(buffer, sizeof(buffer), "%s: %s\r\n", header, field);
+                wrapped_write(out_fd, buffer, strlen(buffer));
+            }
+            snprintf(buffer, sizeof(buffer), "\r\n");
+            wrapped_write(out_fd, buffer, strlen(buffer));
+
+            int n;
+            while (1) {
+                n = read(out_fd, buffer, MAX_LINE - 1); // -1...?
+                if (n <= 0) break;
+                buffer[n] = 0;
+                wrapped_write(in_fd, buffer, n); // !
+            }
+
+            close(out_fd);
         }
     }
     else if (strcmp(method, "CONNECT") == 0) {
@@ -197,6 +261,12 @@ int main() {
             printf("[ERROR]\tSocket accept failed\n");
             return 0;
         }
+
+        struct timeval t;
+        t.tv_sec = 5;
+        t.tv_usec = 0;
+
+        setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &t, sizeof(t)); //
 
         handle_request(connfd);
     }
