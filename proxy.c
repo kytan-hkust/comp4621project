@@ -103,7 +103,7 @@ ssize_t wrapped_read(int fd, char* buf, size_t count) {
         } else if (n == 0) break;
         progress += n;
     }
-    return n;
+    return progress; //
 }
 
 
@@ -135,7 +135,7 @@ void reply_not_implemented(int in_fd, const char* version) {
 }
 
 
-int obtain_out_fd(const char* hostname) {
+int obtain_out_fd(const char* hostname, unsigned short int port) {
     int out_fd;
     struct sockaddr_in servaddr;
 
@@ -153,7 +153,7 @@ int obtain_out_fd(const char* hostname) {
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(80);
+    servaddr.sin_port = htons(port);
 
     char ip_address[48];
     if (!to_ip_addr(hostname, ip_address)) {
@@ -185,7 +185,7 @@ void handle_request(int in_fd) {
     if (strcmp(method, "GET") == 0) {
         if (is_blocked(hostname)) reply_not_found(in_fd, version);
         else {
-            int out_fd = obtain_out_fd(hostname);
+            int out_fd = obtain_out_fd(hostname, 80);
             if (out_fd < 0) {
                 //
             }
@@ -223,7 +223,14 @@ void handle_request(int in_fd) {
     else if (strcmp(method, "CONNECT") == 0) {
         if (is_blocked(hostname)) reply_not_found(in_fd, version);
         else {
+            int out_fd = obtain_out_fd(hostname, 443);
+            if (out_fd < 0) {
+                //
+            }
+
             //
+
+            close(out_fd); //
         }
     }
     else reply_not_implemented(in_fd, version);
