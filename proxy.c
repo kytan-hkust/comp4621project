@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -85,17 +86,36 @@ int is_blocked(const char* hostname) {
 }
 
 
+int is_cached(const char* absolute_url) {
+    return 0;
+}
+
+
+ssize_t wrapped_write(int fd, void* buf, size_t count) {
+    char* t = buf;
+    size_t left = count;
+    ssize_t n;
+
+    while (left > 0) {
+        n = write(fd, t, left);
+        t += n;
+        left -= n;
+    }
+    return count;
+}
+
+
 void reply_not_found(int in_fd, const char* version) {
     char buffer[MAX_LINE];
     snprintf(buffer, sizeof(buffer), "%s 404 Not Found\r\n\r\n", version);
-    write(in_fd, buffer, strlen(buffer));
+    wrapped_write(in_fd, buffer, strlen(buffer));
 }
 
 
 void reply_not_implemented(int in_fd, const char* version) {
     char buffer[MAX_LINE];
     snprintf(buffer, sizeof(buffer), "%s 501 Not Implemented\r\n\r\n", version);
-    write(in_fd, buffer, strlen(buffer));
+    wrapped_write(in_fd, buffer, strlen(buffer));
 }
 
 
