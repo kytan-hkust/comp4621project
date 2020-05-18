@@ -1,6 +1,8 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <map>
+#include <string>
+#include <unordered_map>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -14,8 +16,10 @@
 #define MAX_LINE 8192
 #define PORT     12345
 
+std::unordered_map<std::string, unsigned int> is_cached;
 
-int starts_with(const char* s, const char* prefix) {
+
+inline int starts_with(const char* s, const char* prefix) {
     while (*prefix) {
         if (*s++ != *prefix++) return 0;
     }
@@ -87,19 +91,13 @@ int is_blocked(const char* hostname) {
 }
 
 
-int is_cached(const char* absolute_url) {
-    return 0;
-}
-
-
-ssize_t wrapped_read(int fd, char* buf, size_t count) {
+inline ssize_t wrapped_read(int fd, char* buf, size_t count) {
     size_t progress = 0;
     ssize_t n;
 
     while (progress < count) {
         n = read(fd, buf + progress, count - progress);
         if (n < 0) {
-            printf("[ERROR]\tSocket read failed\n");
             return -1;
         } else if (n == 0) break;
         progress += n;
@@ -108,7 +106,7 @@ ssize_t wrapped_read(int fd, char* buf, size_t count) {
 }
 
 
-ssize_t wrapped_write(int fd, char* buf, size_t count) {
+inline ssize_t wrapped_write(int fd, char* buf, size_t count) {
     char* t = buf;
     size_t left = count;
     ssize_t n;
@@ -122,14 +120,14 @@ ssize_t wrapped_write(int fd, char* buf, size_t count) {
 }
 
 
-void reply_not_found(int in_fd, const char* version) {
+inline void reply_not_found(int in_fd, const char* version) {
     char buffer[MAX_LINE];
     snprintf(buffer, sizeof(buffer), "%s 404 Not Found\r\n\r\n", version);
     wrapped_write(in_fd, buffer, strlen(buffer));
 }
 
 
-void reply_not_implemented(int in_fd, const char* version) {
+inline void reply_not_implemented(int in_fd, const char* version) {
     char buffer[MAX_LINE];
     snprintf(buffer, sizeof(buffer), "%s 501 Not Implemented\r\n\r\n", version);
     wrapped_write(in_fd, buffer, strlen(buffer));
@@ -141,7 +139,7 @@ int obtain_out_fd(const char* hostname, unsigned short int port) {
     struct sockaddr_in servaddr;
 
     struct timeval t;
-    t.tv_sec = 5;
+    t.tv_sec = 4;
     t.tv_usec = 0;
 
     out_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -158,7 +156,7 @@ int obtain_out_fd(const char* hostname, unsigned short int port) {
 
     char ip_address[48];
     if (!to_ip_addr(hostname, ip_address)) {
-        printf("[ERROR]\tIP address lookup failed\n");
+        printf("[ERROR]\tIP address lookup failed, hostname is %s\n", hostname);
         return -1;
     }
     servaddr.sin_addr.s_addr = inet_addr(ip_address);
@@ -186,39 +184,80 @@ void handle_request(int in_fd) {
     if (strcmp(method, "GET") == 0) {
         if (is_blocked(hostname)) reply_not_found(in_fd, version);
         else {
-            int out_fd = obtain_out_fd(hostname, 80);
-            if (out_fd < 0) {
-                //
-            }
+            std::string _hostname(hostname);
+            if (is_cached.count(_hostname)) {
+                printf("[LOG]\tCache hit\n");
 
-            char buffer[MAX_LINE];
-            snprintf(buffer, sizeof(buffer), "%s %s %s\r\n", method, pathname, version);
-            wrapped_write(out_fd, buffer, strlen(buffer));
+                // char filename[10];
+                // snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_hostname]);
+                // FILE* file = fopen(filename, "r");
 
-            char header[1024], field[1024];
-            char* next = request;
-            while (1) {
-                next = strstr(next, "\r\n");
-                next += 2;
-                if (starts_with(next, "\r\n")) break;
-                sscanf(next, "%[^:]: %[^\n]\r\n", header, field);
+                // if (!file) {
+                //     printf("[ERROR]\tFailed to open cached response\n");
+                //     exit(0);
+                // }
 
-                if (strcmp(header, "Proxy-Connection") == 0) strcpy(header, "Connection");
-                snprintf(buffer, sizeof(buffer), "%s: %s\r\n", header, field);
+                // int cache_fd = fileno(file);
+
+                // int n;
+                char buffer[MAX_LINE];
+                // while (1) {
+                //     n = read(cache_fd, buffer, MAX_LINE - 1); // -1...?
+                //     if (n <= 0) break;
+                //     buffer[n] = 0;
+                //     wrapped_write(in_fd, buffer, n); // !
+                // }
+                snprintf(buffer, sizeof(buffer), "%s 200 OK\r\n\r\n<html>Cache Hit</html>", version);
+                wrapped_write(in_fd, buffer, strlen(buffer));
+
+                // if (close(cache_fd) != 0) printf("close failed\n");
+                // if (fclose(file) != 0) printf("fclose failed\n");
+
+            } else {
+                printf("[LOG]\tCache miss\n");
+
+                int out_fd = obtain_out_fd(hostname, 80);
+                if (out_fd < 0) {
+                    //
+                }
+
+                char buffer[MAX_LINE];
+                snprintf(buffer, sizeof(buffer), "%s %s %s\r\n", method, pathname, version);
                 wrapped_write(out_fd, buffer, strlen(buffer));
-            }
-            snprintf(buffer, sizeof(buffer), "\r\n");
-            wrapped_write(out_fd, buffer, strlen(buffer));
 
-            int n;
-            while (1) {
-                n = read(out_fd, buffer, MAX_LINE - 1); // -1...?
-                if (n <= 0) break;
-                buffer[n] = 0;
-                wrapped_write(in_fd, buffer, n); // !
-            }
+                char header[1024], field[1024];
+                char* next = request;
+                while (1) {
+                    next = strstr(next, "\r\n");
+                    next += 2;
+                    if (starts_with(next, "\r\n")) break;
+                    sscanf(next, "%[^:]: %[^\n]\r\n", header, field);
 
-            close(out_fd);
+                    if (strcmp(header, "Proxy-Connection") == 0) strcpy(header, "Connection");
+                    snprintf(buffer, sizeof(buffer), "%s: %s\r\n", header, field);
+                    wrapped_write(out_fd, buffer, strlen(buffer));
+                }
+                snprintf(buffer, sizeof(buffer), "\r\n");
+                wrapped_write(out_fd, buffer, strlen(buffer));
+
+                char filename[10];
+                snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached.size());
+                FILE* file = fopen(filename, "w+");
+                int cache_fd = fileno(file);
+
+                int n;
+                while (1) {
+                    n = read(out_fd, buffer, MAX_LINE - 1); // -1...?
+                    if (n <= 0) break;
+                    buffer[n] = 0;
+                    wrapped_write(in_fd, buffer, n); // !
+                    wrapped_write(cache_fd, buffer, n);
+                }
+
+                close(cache_fd);
+                close(out_fd);
+                is_cached[_hostname] = is_cached.size();
+            }
         }
     }
     else if (strcmp(method, "CONNECT") == 0) {
@@ -271,7 +310,7 @@ int main() {
         }
 
         struct timeval t;
-        t.tv_sec = 5;
+        t.tv_sec = 4;
         t.tv_usec = 0;
 
         setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &t, sizeof(t)); //

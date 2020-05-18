@@ -1,5 +1,5 @@
 CXX      = g++
-CXXFLAGS = -Wall -O2
+CXXFLAGS = -Wall -O2 -std=c++11
 LDFLAGS  = -lpthread
 TARGET   = proxy
 
