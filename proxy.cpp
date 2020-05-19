@@ -186,12 +186,12 @@ void handle_request(int in_fd) {
             printf("[LOG]\t%s is blocked\n", hostname);
             reply_not_found(in_fd, version);
         } else {
-            std::string _hostname(hostname);
-            if (is_cached.count(_hostname)) {
+            std::string _target(target);
+            if (is_cached.count(_target)) {
                 printf("[LOG]\tHTTP cache hit, %s\n", target);
 
                 char filename[10];
-                snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_hostname]);
+                snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_target]);
                 printf("[LOG]\tCached response filename is %s\n", filename);
                 FILE* file = fopen(filename, "r");
 
@@ -258,7 +258,7 @@ void handle_request(int in_fd) {
                 close(cache_fd);
                 close(out_fd);
                 unsigned int c = is_cached.size();
-                is_cached[_hostname] = c;
+                is_cached[_target] = c;
             }
         }
     }
