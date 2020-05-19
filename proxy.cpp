@@ -134,12 +134,12 @@ inline void reply_not_implemented(int in_fd, const char* version) {
 }
 
 
-int obtain_out_fd(const char* hostname, unsigned short int port) {
+int obtain_out_fd(const char* hostname, const unsigned short int port) {
     int out_fd;
     struct sockaddr_in servaddr;
 
     struct timeval t;
-    t.tv_sec = 4;
+    t.tv_sec = 5;
     t.tv_usec = 0;
 
     out_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -182,15 +182,17 @@ void handle_request(int in_fd) {
     parse_absolute_url(target, hostname, pathname);
 
     if (strcmp(method, "GET") == 0) {
-        if (is_blocked(hostname)) reply_not_found(in_fd, version);
-        else {
+        if (is_blocked(hostname)) {
+            printf("[LOG]\t%s is blocked\n", hostname);
+            reply_not_found(in_fd, version);
+        } else {
             std::string _hostname(hostname);
             if (is_cached.count(_hostname)) {
                 printf("[LOG]\tHTTP cache hit, %s\n", target);
 
                 char filename[10];
                 snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_hostname]);
-                printf("[INFO]\tCached response filename is %s\n", filename);
+                printf("[LOG]\tCached response filename is %s\n", filename);
                 FILE* file = fopen(filename, "r");
 
                 if (!file) {
@@ -251,6 +253,8 @@ void handle_request(int in_fd) {
                     wrapped_write(cache_fd, buffer, n);
                 }
 
+                printf("[LOG]\tCached the response at %s\n", filename);
+
                 close(cache_fd);
                 close(out_fd);
                 unsigned int c = is_cached.size();
@@ -259,8 +263,10 @@ void handle_request(int in_fd) {
         }
     }
     else if (strcmp(method, "CONNECT") == 0) {
-        if (is_blocked(hostname)) reply_not_found(in_fd, version);
-        else {
+        if (is_blocked(hostname)) {
+            printf("[LOG]\t%s is blocked\n", hostname);
+            reply_not_found(in_fd, version);
+        } else {
             int out_fd = obtain_out_fd(hostname, 443);
             if (out_fd < 0) {
                 //
@@ -308,7 +314,7 @@ int main() {
         }
 
         struct timeval t;
-        t.tv_sec = 4;
+        t.tv_sec = 5;
         t.tv_usec = 0;
 
         setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char *) &t, sizeof(t)); //

@@ -17,5 +17,5 @@ Change proxy settings to 127.0.0.1 (localhost) as address and 12345 as port.
 - [ ] Multithreading
 - [x] HTTP Requests Forwarding
 - [ ] HTTPS Requests Forwarding
-- [ ] Access Control
+- [x] Access Control
 - [x] Caching
