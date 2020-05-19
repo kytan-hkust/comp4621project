@@ -186,35 +186,32 @@ void handle_request(int in_fd) {
         else {
             std::string _hostname(hostname);
             if (is_cached.count(_hostname)) {
-                printf("[LOG]\tCache hit\n");
+                printf("[LOG]\tHTTP cache hit, %s\n", target);
 
-                // char filename[10];
-                // snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_hostname]);
-                // FILE* file = fopen(filename, "r");
+                char filename[10];
+                snprintf(filename, sizeof(filename), "cache_%u", (unsigned int) is_cached[_hostname]);
+                printf("[INFO]\tCached response filename is %s\n", filename);
+                FILE* file = fopen(filename, "r");
 
-                // if (!file) {
-                //     printf("[ERROR]\tFailed to open cached response\n");
-                //     exit(0);
-                // }
+                if (!file) {
+                    printf("[ERROR]\tFailed to open cached response\n");
+                    exit(0);
+                }
 
-                // int cache_fd = fileno(file);
+                int cache_fd = fileno(file);
 
-                // int n;
+                int n;
                 char buffer[MAX_LINE];
-                // while (1) {
-                //     n = read(cache_fd, buffer, MAX_LINE - 1); // -1...?
-                //     if (n <= 0) break;
-                //     buffer[n] = 0;
-                //     wrapped_write(in_fd, buffer, n); // !
-                // }
-                snprintf(buffer, sizeof(buffer), "%s 200 OK\r\n\r\n<html>Cache Hit</html>", version);
-                wrapped_write(in_fd, buffer, strlen(buffer));
+                while (1) {
+                    n = read(cache_fd, buffer, MAX_LINE - 1); // -1...?
+                    if (n <= 0) break;
+                    buffer[n] = 0;
+                    wrapped_write(in_fd, buffer, n); // !
+                }
 
-                // if (close(cache_fd) != 0) printf("close failed\n");
-                // if (fclose(file) != 0) printf("fclose failed\n");
-
+                close(cache_fd);
             } else {
-                printf("[LOG]\tCache miss\n");
+                printf("[LOG]\tHTTP cache miss, %s\n", target);
 
                 int out_fd = obtain_out_fd(hostname, 80);
                 if (out_fd < 0) {
@@ -256,7 +253,8 @@ void handle_request(int in_fd) {
 
                 close(cache_fd);
                 close(out_fd);
-                is_cached[_hostname] = is_cached.size();
+                unsigned int c = is_cached.size();
+                is_cached[_hostname] = c;
             }
         }
     }
@@ -266,11 +264,11 @@ void handle_request(int in_fd) {
             int out_fd = obtain_out_fd(hostname, 443);
             if (out_fd < 0) {
                 //
+            } else {
+                //
+
+                close(out_fd); //
             }
-
-            //
-
-            close(out_fd); //
         }
     }
     else reply_not_implemented(in_fd, version);
